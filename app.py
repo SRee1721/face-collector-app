@@ -27,7 +27,10 @@ with open(SERVICE_ACCOUNT_FILE, "w") as f:
 cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
 firebase_admin.initialize_app(cred)
 db = firestore.client()'''
-
+cred = credentials.Certificate('/etc/secrets/ServiceAccountKey.json')
+firebase_admin.initialize_app(cred)
+store = firestore.client()
+COLLECTION_NAME = "academy:register
 # InsightFace setup
 faceapp = FaceAnalysis(name='buffalo_sc', root='insightface_model', providers=['CPUExecutionProvider'])
 faceapp.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
