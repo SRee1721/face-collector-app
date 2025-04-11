@@ -34,56 +34,46 @@ def collect_face():
     data = request.json
     person_name = data.get('name')
     role = data.get('role')
+    images_base64 = data.get('images')  # list of base64 strings
 
-    if not person_name or not role:
-        return jsonify({'error': 'Missing name or role'}), 400
+    if not person_name or not role or not images_base64:
+        return jsonify({'error': 'Missing data'}), 400
 
     key = f"{person_name}@{role.upper()}"
-    cap = cv2.VideoCapture(0)
-
-    sample = 0
     face_embeddings = []
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    for img_b64 in images_base64:
+        try:
+            img_data = base64.b64decode(img_b64)
+            np_arr = np.frombuffer(img_data, np.uint8)
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        results = faceapp.get(frame, max_num=1)
-        for res in results:
-            sample += 1
-            x1, y1, x2, y2 = res['bbox'].astype(int)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
-            embeddings = res['embedding']
-            face_embeddings.append(embeddings)
-            if sample >= 700:
-                break
+            results = faceapp.get(img, max_num=1)
+            if results:
+                embeddings = results[0]['embedding']
+                face_embeddings.append(embeddings)
+        except Exception as e:
+            print("Error processing one image:", str(e))
 
-        if sample >= 700:
-            break
+    if not face_embeddings:
+        return jsonify({'error': 'No faces detected in any image'}), 400
 
-    cap.release()
-    cv2.destroyAllWindows()
+    facial_features = np.asarray(face_embeddings).mean(axis=0)
+    facial_features_bytes = facial_features.tobytes()
 
-    if len(face_embeddings) > 0:
-        facial_features = np.asarray(face_embeddings).mean(axis=0)
-        facial_features_bytes = facial_features.tobytes()
+    doc_ref = store.collection(COLLECTION_NAME).document("facial_features")
+    doc = doc_ref.get()
 
-        doc_ref = store.collection(COLLECTION_NAME).document("facial_features")
-        doc = doc_ref.get()
-
-        if doc.exists:
-            data = doc.to_dict()
-            if key not in data:
-                doc_ref.set({key: facial_features_bytes}, merge=True)
-                return jsonify({"message": "Face data added"}), 200
-            else:
-                return jsonify({"message": "Face data already exists"}), 200
+    if doc.exists:
+        data = doc.to_dict()
+        if key not in data:
+            doc_ref.set({key: facial_features_bytes}, merge=True)
+            return jsonify({"message": "Face data added"}), 200
         else:
-            doc_ref.set({key: facial_features_bytes})
-            return jsonify({"message": "Document created with first face data"}), 200
+            return jsonify({"message": "Face data already exists"}), 200
     else:
-        return jsonify({"error": "No face detected"}), 400
+        doc_ref.set({key: facial_features_bytes})
+        return jsonify({"message": "Document created with first face data"}), 200
 
 @app.route('/')
 def home():
