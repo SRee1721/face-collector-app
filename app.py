@@ -12,9 +12,9 @@ app = Flask(__name__)
 COLLECTION_NAME = "academy:register"
 
 
-'''@app.route('/')
+@app.route('/')
 def index():
-    return render_template('index.html')'''
+    return render_template('index.html')
 
 
 @app.route('/start-face-collection', methods=['POST'])
