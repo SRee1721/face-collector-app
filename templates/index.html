@@ -1,22 +1,181 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Face Collector</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSN Face Collector</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        background: #f4f6f9;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      header img {
+        width: 100px;
+        height: auto;
+        margin-bottom: 10px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 26px;
+        color: #0a3d62;
+      }
+
+      form {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      form label {
+        display: block;
+        margin: 10px 0 5px;
+        font-weight: bold;
+      }
+
+      form input,
+      form select,
+      form button {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        margin-bottom: 15px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+
+      form button {
+        background-color: #0a3d62;
+        color: white;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+
+      form button:hover {
+        background-color: #1e6091;
+      }
+
+      video {
+        display: none;
+        border: 2px solid #0a3d62;
+        border-radius: 10px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        max-width: 90%;
+        margin-top: 20px;
+      }
+
+      footer {
+        margin-top: 30px;
+        font-size: 14px;
+        color: #666;
+      }
+    </style>
   </head>
   <body>
-    <h2>Face Registration</h2>
+    <header>
+      <img
+        src="https://upload.wikimedia.org/wikipedia/en/2/24/SSNCE_logo.png"
+        alt="SSN College Logo"
+      />
+      <h1>SSN Face Collector</h1>
+    </header>
+
     <form id="infoForm">
       <label for="name">Name:</label>
-      <input type="text" id="name" required /><br />
+      <input type="text" id="name" required />
+
       <label for="role">Role:</label>
       <select id="role" required>
         <option value="STUDENT">Student</option>
-        <option value="TEACHER">Teacher</option></select
-      ><br />
+        <option value="TEACHER">Teacher</option>
+      </select>
+
       <button type="submit">Start Face Collection</button>
     </form>
 
     <video id="video" width="640" height="480" autoplay></video>
-    <script src="/static/script.js"></script>
+
+    <script>
+      const form = document.getElementById("infoForm");
+      const video = document.getElementById("video");
+      let intervalId = null;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("name").value;
+        const role = document.getElementById("role").value;
+
+        const res = await fetch("/start-face-collection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, role }),
+        });
+
+        const result = await res.json();
+        if (result.message === "Collection started") {
+          // Now request camera access
+          navigator.mediaDevices
+            .getUserMedia({ video: true })
+            .then((stream) => {
+              video.style.display = "block";
+              video.srcObject = stream;
+              const track = stream.getVideoTracks()[0];
+              const imageCapture = new ImageCapture(track);
+
+              intervalId = setInterval(() => {
+                imageCapture.grabFrame().then((bitmap) => {
+                  const canvas = document.createElement("canvas");
+                  canvas.width = bitmap.width;
+                  canvas.height = bitmap.height;
+                  const ctx = canvas.getContext("2d");
+                  ctx.drawImage(bitmap, 0, 0);
+                  canvas.toBlob((blob) => {
+                    const formData = new FormData();
+                    formData.append("frame", blob, "frame.jpg");
+
+                    fetch("/upload-frame", {
+                      method: "POST",
+                      body: formData,
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (data.done) {
+                          clearInterval(intervalId);
+                          alert(" Face data collection complete!");
+                        }
+                      });
+                  }, "image/jpeg");
+                });
+              }, 300);
+            })
+            .catch((err) => {
+              console.error("Camera access error:", err);
+              alert(" Unable to access the camera. Please allow permissions.");
+            });
+        }
+      });
+    </script>
+
+    <footer>
+      &copy; 2025 SSN College of Engineering. All rights reserved.
+    </footer>
   </body>
 </html>
