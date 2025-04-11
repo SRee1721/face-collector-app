@@ -1,49 +1,94 @@
-from flask import Flask, render_template, request, jsonify
-import firebase_admin
-from firebase_admin import credentials, firestore
-import numpy as np
-from face_utils import collect_face_embeddings
 
-cred = credentials.Certificate('/etc/secrets/ServiceAccountKey.json')
+'''cred = credentials.Certificate('/etc/secrets/ServiceAccountKey.json')
 firebase_admin.initialize_app(cred)
 store = firestore.client()
 
 app = Flask(__name__)
-COLLECTION_NAME = "academy:register"
+COLLECTION_NAME = "academy:register"'''
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import numpy as np
+import cv2
+import firebase_admin
+from firebase_admin import credentials, firestore
+from insightface.app import FaceAnalysis
+import os
+import base64
 
+# Init Flask
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all domains (or restrict using origins=[])
 
-'''@app.route('/')
-def index():
-    return render_template('index.html')'''
+# Load Firebase credentials from Render ENV file
+'''SERVICE_ACCOUNT_FILE = "serviceAccountKey.json"
+with open(SERVICE_ACCOUNT_FILE, "w") as f:
+    f.write(os.environ.get("SERVICE_ACCOUNT_JSON"))
 
+cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+firebase_admin.initialize_app(cred)
+db = firestore.client()'''
 
-@app.route('/start-face-collection', methods=['POST'])
-def start_face_collection():
-    data = request.get_json()
-    name = data['name']
-    role = data['role']
+# InsightFace setup
+faceapp = FaceAnalysis(name='buffalo_sc', root='insightface_model', providers=['CPUExecutionProvider'])
+faceapp.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
 
-    name_role, facial_features = collect_face_embeddings(name, role)
+@app.route('/collect-face', methods=['POST'])
+def collect_face():
+    data = request.json
+    person_name = data.get('name')
+    role = data.get('role')
 
-    if facial_features.size == 0:
-        return jsonify({"message": "No faces detected."})
+    if not person_name or not role:
+        return jsonify({'error': 'Missing name or role'}), 400
 
-    doc_ref = store.collection(COLLECTION_NAME).document('facial_features')
-    doc = doc_ref.get()
+    key = f"{person_name}@{role.upper()}"
+    cap = cv2.VideoCapture(0)
 
-    facial_features_bytes = facial_features.tobytes()
+    sample = 0
+    face_embeddings = []
 
-    if doc.exists:
-        existing_data = doc.to_dict()
-        if name_role in existing_data:
-            return jsonify({"message": "User already exists."})
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        results = faceapp.get(frame, max_num=1)
+        for res in results:
+            sample += 1
+            embeddings = res['embedding']
+            face_embeddings.append(embeddings)
+            if sample >= 200:
+                break
+
+        if sample >= 200:
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    if len(face_embeddings) > 0:
+        facial_features = np.asarray(face_embeddings).mean(axis=0)
+        facial_features_bytes = facial_features.tobytes()
+
+        doc_ref = db.collection("facial_features").document("data")
+        doc = doc_ref.get()
+
+        if doc.exists:
+            data = doc.to_dict()
+            if key not in data:
+                doc_ref.set({key: facial_features_bytes}, merge=True)
+                return jsonify({"message": "Face data added"}), 200
+            else:
+                return jsonify({"message": "Face data already exists"}), 200
         else:
-            doc_ref.set({name_role: facial_features_bytes}, merge=True)
-            return jsonify({"message": "Face data added."})
+            doc_ref.set({key: facial_features_bytes})
+            return jsonify({"message": "Document created with first face data"}), 200
     else:
-        doc_ref.set({name_role: facial_features_bytes})
-        return jsonify({"message": "Document created with first face data."})
+        return jsonify({"error": "No face detected"}), 400
 
+@app.route('/')
+def home():
+    return "Backend is running"
 
 if __name__ == '__main__':
     app.run(debug=True)
