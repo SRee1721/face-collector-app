@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Face Collector</title>
+  </head>
+  <body>
+    <h2>Face Registration</h2>
+    <form id="infoForm">
+      <label for="name">Name:</label>
+      <input type="text" id="name" required /><br />
+      <label for="role">Role:</label>
+      <select id="role" required>
+        <option value="STUDENT">Student</option>
+        <option value="TEACHER">Teacher</option></select
+      ><br />
+      <button type="submit">Start Face Collection</button>
+    </form>
+
+    <video id="video" width="640" height="480" autoplay></video>
+    <script src="/static/script.js"></script>
+  </body>
+</html>
