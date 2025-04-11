@@ -58,12 +58,14 @@ def collect_face():
         results = faceapp.get(frame, max_num=1)
         for res in results:
             sample += 1
+            x1, y1, x2, y2 = res['bbox'].astype(int)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
             embeddings = res['embedding']
             face_embeddings.append(embeddings)
-            if sample >= 200:
+            if sample >= 700:
                 break
 
-        if sample >= 200:
+        if sample >= 700:
             break
 
     cap.release()
@@ -73,7 +75,7 @@ def collect_face():
         facial_features = np.asarray(face_embeddings).mean(axis=0)
         facial_features_bytes = facial_features.tobytes()
 
-        doc_ref = db.collection("facial_features").document("data")
+        doc_ref = db.collection(COLLECTION_NAME).document("facial_features")
         doc = doc_ref.get()
 
         if doc.exists:
