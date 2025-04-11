@@ -20,13 +20,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all domains (or restrict using origins=[])
 
 # Load Firebase credentials from Render ENV file
-'''SERVICE_ACCOUNT_FILE = "serviceAccountKey.json"
-with open(SERVICE_ACCOUNT_FILE, "w") as f:
-    f.write(os.environ.get("SERVICE_ACCOUNT_JSON"))
 
-cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
-firebase_admin.initialize_app(cred)
-db = firestore.client()'''
 cred = credentials.Certificate('/etc/secrets/ServiceAccountKey.json')
 firebase_admin.initialize_app(cred)
 store = firestore.client()
@@ -75,7 +69,7 @@ def collect_face():
         facial_features = np.asarray(face_embeddings).mean(axis=0)
         facial_features_bytes = facial_features.tobytes()
 
-        doc_ref = db.collection(COLLECTION_NAME).document("facial_features")
+        doc_ref = store.collection(COLLECTION_NAME).document("facial_features")
         doc = doc_ref.get()
 
         if doc.exists:
