@@ -4,7 +4,7 @@ from firebase_admin import credentials, firestore
 import numpy as np
 from face_utils import collect_face_embeddings
 
-cred = credentials.Certificate('ServiceAccountKey.json')
+cred = credentials.Certificate('/etc/secrets/ServiceAccountKey.json')
 firebase_admin.initialize_app(cred)
 store = firestore.client()
 
