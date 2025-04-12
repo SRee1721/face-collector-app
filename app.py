@@ -20,7 +20,7 @@ faceapp.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
 
 # Shared session state
 received_embeddings = []
-sample_limit = 400
+sample_limit = 100
 current_name_role = None
 
 
